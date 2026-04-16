@@ -1,0 +1,266 @@
+{
+  "selected_topics_for_sampling": [
+    "Politics",
+    "Sports",
+    "HealthSociety"
+  ],
+  "sentence_count": 500,
+  "lexicon_sizes": {
+    "noun": 220,
+    "verb": 220,
+    "adj": 220,
+    "per_gazetteer": 61,
+    "loc_gazetteer": 58,
+    "org_gazetteer": 33
+  },
+  "split_sizes": {
+    "train": 350,
+    "val": 75,
+    "test": 75
+  },
+  "label_distribution": {
+    "pos": {
+      "train": {
+        "NOUN": 2569,
+        "POST": 1400,
+        "VERB": 2768,
+        "PRON": 678,
+        "AUX": 474,
+        "ADJ": 242,
+        "CONJ": 315,
+        "DET": 102,
+        "ADV": 91,
+        "UNK": 80,
+        "NUM": 70,
+        "PUNC": 27
+      },
+      "val": {
+        "VERB": 583,
+        "NOUN": 570,
+        "POST": 315,
+        "AUX": 104,
+        "PRON": 140,
+        "ADJ": 59,
+        "PUNC": 9,
+        "UNK": 14,
+        "CONJ": 65,
+        "DET": 19,
+        "ADV": 16,
+        "NUM": 16
+      },
+      "test": {
+        "NOUN": 577,
+        "VERB": 595,
+        "POST": 324,
+        "NUM": 20,
+        "PRON": 155,
+        "ADJ": 36,
+        "CONJ": 61,
+        "AUX": 91,
+        "DET": 16,
+        "UNK": 31,
+        "ADV": 23,
+        "PUNC": 7
+      }
+    },
+    "ner": {
+      "train": {
+        "O": 8554,
+        "B-ORG": 71,
+        "B-LOC": 119,
+        "B-PER": 28,
+        "I-ORG": 28,
+        "I-LOC": 2,
+        "B-MISC": 12,
+        "I-PER": 2
+      },
+      "val": {
+        "O": 1848,
+        "B-LOC": 25,
+        "B-ORG": 20,
+        "B-MISC": 6,
+        "I-ORG": 8,
+        "B-PER": 3
+      },
+      "test": {
+        "O": 1862,
+        "B-LOC": 32,
+        "B-ORG": 21,
+        "B-PER": 3,
+        "B-MISC": 5,
+        "I-ORG": 11,
+        "I-LOC": 1,
+        "I-PER": 1
+      }
+    }
+  },
+  "embedding_init": {
+    "matched_tokens_with_part1_embeddings": 2053,
+    "vocab_size": 2078
+  },
+  "pos_results": {
+    "frozen_val_f1": 0.4658227950957993,
+    "finetuned_val_f1": 0.895525122090178,
+    "test_accuracy": 0.8456692913385827,
+    "test_macro_f1": 0.8493565888751611,
+    "top_confused_pairs": [
+      {
+        "pair": "NOUN->VERB",
+        "count": 253,
+        "examples": [
+          "بنگلہ دیش کی ٹیم نے مقررہ <NUM> اوورز میں پانچ وکٹ کے نقصان پر <NUM> رنز بنای اور پاکستان کو جیت کے لی <NUM> رنز کا ہدف دے دیا تھا",
+          "بنگلہ دیش کی ٹیم نے مقررہ <NUM> اوورز میں پانچ وکٹ کے نقصان پر <NUM> رنز بنای اور پاکستان کو جیت کے لی <NUM> رنز کا ہدف دے دیا تھا"
+        ]
+      },
+      {
+        "pair": "ADJ->NOUN",
+        "count": 11,
+        "examples": [
+          "یہ بزرگ خاتون ان ایران نوجوان کے لی بھ پریشان تھ جنھ جنگ کے دوران ایران کی نیم فوج ادار بسیج کی جانب سے دھمک کا سام کر پڑا جبکہ شہر کے گل محل میں گر وال شیل بھ انھ خوفزدہ کر تھ",
+          "جس وجہ سے کی مواقع پر انفیکشن کنٹرول پروگرام پر سمجھوتہ ہوجا ہے"
+        ]
+      },
+      {
+        "pair": "ADJ->VERB",
+        "count": 10,
+        "examples": [
+          "بنگلہ دیش کی ٹیم نے مقررہ <NUM> اوورز میں پانچ وکٹ کے نقصان پر <NUM> رنز بنای اور پاکستان کو جیت کے لی <NUM> رنز کا ہدف دے دیا تھا",
+          "اس ہنگام کے درمیان موسیقار او پی نییر کے ساتھ ان کی بڑھ ہوی قربت نے فلم حلق میں ہلچل مچا دی"
+        ]
+      }
+    ]
+  },
+  "ner_results": {
+    "crf_frozen_val_f1": 0.0,
+    "crf_finetuned_val_f1": 0.0,
+    "test_overall_f1_crf": 0.0,
+    "test_overall_f1_softmax": 0.4477611940298507,
+    "entity_report_crf": {
+      "LOC": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 32
+      },
+      "MISC": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 5
+      },
+      "ORG": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 21
+      },
+      "PER": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 3
+      },
+      "micro avg": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 61
+      },
+      "macro avg": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 61
+      },
+      "weighted avg": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 61
+      }
+    },
+    "entity_report_softmax": {
+      "LOC": {
+        "precision": 0.46153846153846156,
+        "recall": 0.75,
+        "f1-score": 0.5714285714285714,
+        "support": 32
+      },
+      "MISC": {
+        "precision": 0.4,
+        "recall": 0.4,
+        "f1-score": 0.4000000000000001,
+        "support": 5
+      },
+      "ORG": {
+        "precision": 0.2,
+        "recall": 0.09523809523809523,
+        "f1-score": 0.12903225806451613,
+        "support": 21
+      },
+      "PER": {
+        "precision": 0.3333333333333333,
+        "recall": 0.6666666666666666,
+        "f1-score": 0.4444444444444444,
+        "support": 3
+      },
+      "micro avg": {
+        "precision": 0.410958904109589,
+        "recall": 0.4918032786885246,
+        "f1-score": 0.4477611940298507,
+        "support": 61
+      },
+      "macro avg": {
+        "precision": 0.3487179487179487,
+        "recall": 0.47797619047619044,
+        "f1-score": 0.386226318484383,
+        "support": 61
+      },
+      "weighted avg": {
+        "precision": 0.3601513240857503,
+        "recall": 0.4918032786885246,
+        "f1-score": 0.39883155800659764,
+        "support": 61
+      }
+    },
+    "false_positives": [],
+    "false_negatives": [
+      {
+        "token": "بنگلہ",
+        "true": "B-LOC",
+        "pred": "O",
+        "sentence": "بنگلہ دیش کی ٹیم نے مقررہ <NUM> اوورز میں پانچ وکٹ کے نقصان پر <NUM> رنز بنای اور پاکستان کو جیت کے لی <NUM> رنز کا ہدف دے دیا تھا"
+      },
+      {
+        "token": "اس",
+        "true": "B-ORG",
+        "pred": "O",
+        "sentence": "اس ہنگام کے درمیان موسیقار او پی نییر کے ساتھ ان کی بڑھ ہوی قربت نے فلم حلق میں ہلچل مچا دی"
+      },
+      {
+        "token": "یہ",
+        "true": "B-LOC",
+        "pred": "O",
+        "sentence": "یہ بزرگ خاتون ان ایران نوجوان کے لی بھ پریشان تھ جنھ جنگ کے دوران ایران کی نیم فوج ادار بسیج کی جانب سے دھمک کا سام کر پڑا جبکہ شہر کے گل محل میں گر وال شیل بھ انھ خوفزدہ کر تھ"
+      },
+      {
+        "token": "بزرگ",
+        "true": "B-LOC",
+        "pred": "O",
+        "sentence": "یہ بزرگ خاتون ان ایران نوجوان کے لی بھ پریشان تھ جنھ جنگ کے دوران ایران کی نیم فوج ادار بسیج کی جانب سے دھمک کا سام کر پڑا جبکہ شہر کے گل محل میں گر وال شیل بھ انھ خوفزدہ کر تھ"
+      },
+      {
+        "token": "خاتون",
+        "true": "B-ORG",
+        "pred": "O",
+        "sentence": "یہ بزرگ خاتون ان ایران نوجوان کے لی بھ پریشان تھ جنھ جنگ کے دوران ایران کی نیم فوج ادار بسیج کی جانب سے دھمک کا سام کر پڑا جبکہ شہر کے گل محل میں گر وال شیل بھ انھ خوفزدہ کر تھ"
+      }
+    ]
+  },
+  "ablations": {
+    "A1_unidirectional_lstm": 0.0,
+    "A2_no_dropout": 0.0,
+    "A3_random_embeddings": 0.0,
+    "A4_softmax_instead_of_crf": 0.4477611940298507
+  }
+}
