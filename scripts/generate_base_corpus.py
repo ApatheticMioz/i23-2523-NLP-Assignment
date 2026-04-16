@@ -87,6 +87,8 @@ def scrape_bbc_urdu(target_count=260, min_body_chars=300, sleep_s=0.3):
         except Exception:
             continue
 
+        response.encoding = "utf-8"
+
         soup = BeautifulSoup(response.text, "html.parser")
 
         for a in soup.find_all("a", href=True):
