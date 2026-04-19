@@ -4,6 +4,7 @@ __pycache__/
 .ipynb_checkpoints/
 *.tmp
 *.log
+*.zip
 
 # Generated heavy artifacts (keep local for submission zip)
 embeddings/*.npy
