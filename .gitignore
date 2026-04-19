@@ -9,3 +9,4 @@ __pycache__/
 embeddings/*.npy
 models/*.pt
 
+assignment_instructions.md
