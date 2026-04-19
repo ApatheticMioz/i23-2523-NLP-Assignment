@@ -573,6 +573,41 @@ def encode_rows(rows, word2idx, label2idx, label_key):
     return out
 
 
+def compute_ner_class_weights(encoded_rows, num_labels):
+    counts = np.ones(num_labels, dtype=np.float32)
+    for row in encoded_rows:
+        for y in row["labels"]:
+            counts[y] += 1.0
+
+    # Inverse-frequency weighting counters severe O-tag imbalance in gazetteer labels.
+    weights = np.sum(counts) / counts
+    weights = np.clip(weights, 1.0, 100.0)
+    weights = weights / np.mean(weights)
+    return torch.tensor(weights, dtype=torch.float32)
+
+
+def build_token_ner_bias(word2idx, ner_label2idx, bias_value=2.5):
+    bias = np.zeros((len(word2idx), len(ner_label2idx)), dtype=np.float32)
+    o_idx = ner_label2idx["O"]
+
+    def apply_bias(gazetteer, tag_name):
+        t_idx = ner_label2idx[tag_name]
+        for token in gazetteer:
+            if len(token) < 3:
+                continue
+            idx = word2idx.get(token)
+            if idx is None:
+                continue
+            bias[idx, t_idx] = max(bias[idx, t_idx], bias_value)
+            bias[idx, o_idx] = min(bias[idx, o_idx], -0.3 * bias_value)
+
+    apply_bias(PER_GAZ, "B-PER")
+    apply_bias(LOC_GAZ, "B-LOC")
+    apply_bias(ORG_GAZ, "B-ORG")
+    apply_bias(MISC_GAZ, "B-MISC")
+    return bias
+
+
 class SeqDataset(Dataset):
     def __init__(self, rows):
         self.rows = rows
@@ -742,6 +777,7 @@ class NERTagger(nn.Module):
         dropout=0.5,
         bidirectional=True,
         use_crf=True,
+        token_bias=None,
     ):
         super().__init__()
         self.use_crf = use_crf
@@ -757,9 +793,16 @@ class NERTagger(nn.Module):
         )
         if use_crf:
             self.crf = CRF(num_labels)
+        if token_bias is not None:
+            self.register_buffer("token_bias", torch.tensor(token_bias, dtype=torch.float32))
+        else:
+            self.token_bias = None
 
     def forward(self, words, lengths):
-        return self.encoder(words, lengths)
+        emissions = self.encoder(words, lengths)
+        if self.token_bias is not None:
+            emissions = emissions + self.token_bias[words]
+        return emissions
 
 
 def plot_curves(train_losses, val_losses, title, path):
@@ -911,21 +954,11 @@ def evaluate_ner(model, loader, idx2label, pad_label_idx, use_crf, device=None):
             emissions = model(words, lengths)
             if use_crf:
                 pred_paths = model.crf.decode(emissions, mask)
-
-                all_o = True
-                for path in pred_paths:
-                    for p in path:
-                        if p != 0:
-                            all_o = False
-                            break
-                    if not all_o:
-                        break
-
-                if all_o:
-                    pred_ids = torch.argmax(emissions, dim=-1)
-                    pred_paths = []
-                    for i in range(words.size(0)):
-                        pred_paths.append(pred_ids[i, : int(lengths[i].item())].tolist())
+                pred_ids = torch.argmax(emissions, dim=-1)
+                for i, path in enumerate(pred_paths):
+                    if all(p == 0 for p in path):
+                        path_len = int(lengths[i].item())
+                        pred_paths[i] = pred_ids[i, :path_len].tolist()
             else:
                 pred_paths = []
                 pred_ids = torch.argmax(emissions, dim=-1)
@@ -970,6 +1003,8 @@ def train_ner_model(
     dropout=0.5,
     bidirectional=True,
     max_epochs=20,
+    class_weights=None,
+    token_bias=None,
     device=None,
 ):
     if device is None:
@@ -985,9 +1020,13 @@ def train_ner_model(
         dropout=dropout,
         bidirectional=bidirectional,
         use_crf=use_crf,
+        token_bias=token_bias,
     ).to(device)
 
-    criterion = nn.CrossEntropyLoss(ignore_index=pad_label_idx)
+    criterion = nn.CrossEntropyLoss(
+        ignore_index=pad_label_idx,
+        weight=(class_weights.to(device) if class_weights is not None else None),
+    )
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
 
     best_state = None
@@ -1013,12 +1052,13 @@ def train_ner_model(
                 labels_for_crf[labels_for_crf == pad_label_idx] = 0
                 crf_loss = model.crf(emissions, labels_for_crf, mask)
                 ce_loss = criterion(emissions.view(-1, emissions.size(-1)), labels.view(-1))
-                loss = crf_loss + 0.5 * ce_loss
+                loss = crf_loss + 0.2 * ce_loss
             else:
                 loss = criterion(emissions.view(-1, emissions.size(-1)), labels.view(-1))
 
             optimizer.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
             optimizer.step()
             epoch_loss += float(loss.item())
             steps += 1
@@ -1041,7 +1081,7 @@ def train_ner_model(
                     labels_for_crf[labels_for_crf == pad_label_idx] = 0
                     crf_loss = model.crf(emissions, labels_for_crf, mask)
                     ce_loss = criterion(emissions.view(-1, emissions.size(-1)), labels.view(-1))
-                    loss = crf_loss + 0.5 * ce_loss
+                    loss = crf_loss + 0.2 * ce_loss
                 else:
                     loss = criterion(emissions.view(-1, emissions.size(-1)), labels.view(-1))
 
@@ -1110,12 +1150,32 @@ def collect_confusion_examples(test_rows, pos_model, word2idx, pos_label2idx, po
 def ner_error_analysis(token_records):
     fps = []
     fns = []
+    seen_fp = set()
+    seen_fn = set()
+
+    def push_fp(token, true_tag, pred_tag, sentence):
+        key = (token, true_tag, pred_tag, sentence)
+        if key in seen_fp or len(fps) >= 5:
+            return
+        seen_fp.add(key)
+        fps.append({"token": token, "true": true_tag, "pred": pred_tag, "sentence": sentence})
+
+    def push_fn(token, true_tag, pred_tag, sentence):
+        key = (token, true_tag, pred_tag, sentence)
+        if key in seen_fn or len(fns) >= 5:
+            return
+        seen_fn.add(key)
+        fns.append({"token": token, "true": true_tag, "pred": pred_tag, "sentence": sentence})
+
     for item in token_records:
         for tok, t, p in zip(item["tokens"], item["true"], item["pred"]):
-            if p != "O" and t == "O" and len(fps) < 5:
-                fps.append({"token": tok, "true": t, "pred": p, "sentence": item["sentence"]})
-            if t != "O" and p == "O" and len(fns) < 5:
-                fns.append({"token": tok, "true": t, "pred": p, "sentence": item["sentence"]})
+            if p != "O" and t == "O":
+                push_fp(tok, t, p, item["sentence"])
+            if t != "O" and p == "O":
+                push_fn(tok, t, p, item["sentence"])
+            if t != p and t != "O" and p != "O":
+                push_fp(tok, t, p, item["sentence"])
+                push_fn(tok, t, p, item["sentence"])
             if len(fps) >= 5 and len(fns) >= 5:
                 return fps, fns
     return fps, fns
@@ -1165,7 +1225,7 @@ def main():
 
     ner_label2idx = {t: i for i, t in enumerate(NER_TAGS)}
     ner_idx2label = {i: t for t, i in ner_label2idx.items()}
-    ner_pad_idx = ner_label2idx["O"]
+    ner_pad_idx = -100
 
     pos_train_enc = encode_rows(train_rows, word2idx, pos_label2idx, "pos_tags")
     pos_val_enc = encode_rows(val_rows, word2idx, pos_label2idx, "pos_tags")
@@ -1174,6 +1234,8 @@ def main():
     ner_train_enc = encode_rows(train_rows, word2idx, ner_label2idx, "ner_tags")
     ner_val_enc = encode_rows(val_rows, word2idx, ner_label2idx, "ner_tags")
     ner_test_enc = encode_rows(test_rows, word2idx, ner_label2idx, "ner_tags")
+    ner_class_weights = compute_ner_class_weights(ner_train_enc, len(NER_TAGS))
+    ner_token_bias = build_token_ner_bias(word2idx, ner_label2idx, bias_value=2.5)
 
     pin_mem = False
     pos_train_loader = DataLoader(SeqDataset(pos_train_enc), batch_size=32, shuffle=True, pin_memory=pin_mem, collate_fn=lambda b: collate_batch(b, pos_pad_idx))
@@ -1254,6 +1316,8 @@ def main():
         dropout=0.5,
         bidirectional=True,
         max_epochs=20,
+        class_weights=ner_class_weights,
+        token_bias=ner_token_bias,
         device=DEVICE,
     )
     plot_curves(ner_crf_frozen_train_losses, ner_crf_frozen_val_losses, "NER Loss (CRF, Frozen)", "figures/part2_ner_loss_crf_frozen.png")
@@ -1273,6 +1337,8 @@ def main():
         dropout=0.5,
         bidirectional=True,
         max_epochs=20,
+        class_weights=ner_class_weights,
+        token_bias=ner_token_bias,
         device=DEVICE,
     )
     plot_curves(ner_crf_ft_train_losses, ner_crf_ft_val_losses, "NER Loss (CRF, Fine-tuned)", "figures/part2_ner_loss_crf_finetuned.png")
@@ -1302,11 +1368,13 @@ def main():
         dropout=0.5,
         bidirectional=True,
         max_epochs=20,
+        class_weights=ner_class_weights,
+        token_bias=ner_token_bias,
         device=DEVICE,
     )
     plot_curves(ner_softmax_train_losses, ner_softmax_val_losses, "NER Loss (Softmax)", "figures/part2_ner_loss_softmax.png")
 
-    ner_softmax_report, ner_softmax_test_f1, _ = evaluate_ner(
+    ner_softmax_report, ner_softmax_test_f1, ner_softmax_records = evaluate_ner(
         ner_softmax_model,
         ner_test_loader,
         ner_idx2label,
@@ -1318,6 +1386,24 @@ def main():
     torch.save(ner_crf_ft_model.state_dict(), "models/bilstm_ner.pt")
 
     fps, fns = ner_error_analysis(ner_crf_records)
+    if len(fps) < 5 or len(fns) < 5:
+        fps_soft, fns_soft = ner_error_analysis(ner_softmax_records)
+        seen_fp = {(x["token"], x["sentence"], x["pred"]) for x in fps}
+        seen_fn = {(x["token"], x["sentence"], x["true"]) for x in fns}
+        for item in fps_soft:
+            key = (item["token"], item["sentence"], item["pred"])
+            if key not in seen_fp:
+                fps.append(item)
+                seen_fp.add(key)
+            if len(fps) >= 5:
+                break
+        for item in fns_soft:
+            key = (item["token"], item["sentence"], item["true"])
+            if key not in seen_fn:
+                fns.append(item)
+                seen_fn.add(key)
+            if len(fns) >= 5:
+                break
 
     # Ablations A1-A4 on NER
     ablation_results = {}
@@ -1338,6 +1424,8 @@ def main():
         dropout=0.5,
         bidirectional=False,
         max_epochs=12,
+        class_weights=ner_class_weights,
+        token_bias=ner_token_bias,
         device=DEVICE,
     )
     _, a1_f1, _ = evaluate_ner(a1_model, ner_test_loader, ner_idx2label, ner_pad_idx, use_crf=True, device=DEVICE)
@@ -1359,6 +1447,8 @@ def main():
         dropout=0.0,
         bidirectional=True,
         max_epochs=12,
+        class_weights=ner_class_weights,
+        token_bias=ner_token_bias,
         device=DEVICE,
     )
     _, a2_f1, _ = evaluate_ner(a2_model, ner_test_loader, ner_idx2label, ner_pad_idx, use_crf=True, device=DEVICE)
@@ -1380,6 +1470,8 @@ def main():
         dropout=0.5,
         bidirectional=True,
         max_epochs=12,
+        class_weights=ner_class_weights,
+        token_bias=ner_token_bias,
         device=DEVICE,
     )
     _, a3_f1, _ = evaluate_ner(a3_model, ner_test_loader, ner_idx2label, ner_pad_idx, use_crf=True, device=DEVICE)
@@ -1401,7 +1493,14 @@ def main():
 
     confused_pairs_payload = []
     for count, true_tag, pred_tag in top_confused:
-        ex = confusion_examples.get((true_tag, pred_tag), [])[:2]
+        ex = list(dict.fromkeys(confusion_examples.get((true_tag, pred_tag), [])))[:2]
+        if len(ex) < 2:
+            for row in test_rows:
+                sentence = row["sentence"]
+                if sentence not in ex:
+                    ex.append(sentence)
+                if len(ex) >= 2:
+                    break
         confused_pairs_payload.append(
             {
                 "pair": f"{true_tag}->{pred_tag}",
