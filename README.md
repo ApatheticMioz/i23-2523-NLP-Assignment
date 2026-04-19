@@ -1,7 +1,7 @@
 # i23-2523 NLP Assignment 2
 
 Repository URL:
-https://github.com/ApatheticMioz/i23-2523_NLP-Assignment2
+https://github.com/ApatheticMioz/i23-2523-NLP-Assignment
 
 ## Environment Setup
 
