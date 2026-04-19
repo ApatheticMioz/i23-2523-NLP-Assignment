@@ -1,7 +1,7 @@
 # i23-2523 NLP Assignment 2
 
 Repository URL:
-https://github.com/ApatheticMioz/nlp-transformer-bilstm-pipeline
+https://github.com/ApatheticMioz/i23-2523_NLP-Assignment2
 
 ## Environment Setup
 
