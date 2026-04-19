@@ -1,0 +1,34 @@
+# Strict final-submission workspace: ignore everything by default.
+*
+
+# Keep repository control files.
+!.gitattributes
+!.gitignore
+
+# Keep only required top-level submission artifacts.
+!i23-2523_Assignment2_DS-A.ipynb
+!report.pdf
+
+# Keep required embeddings files only.
+!embeddings/
+embeddings/*
+!embeddings/tfidf_matrix.npy
+!embeddings/ppmi_matrix.npy
+!embeddings/embeddings_w2v.npy
+!embeddings/word2idx.json
+
+# Keep required model files only.
+!models/
+models/*
+!models/bilstm_pos.pt
+!models/bilstm_ner.pt
+!models/transformer_cls.pt
+
+# Keep required data files only.
+!data/
+data/*
+!data/pos_train.conll
+!data/pos_test.conll
+!data/ner_train.conll
+!data/ner_test.conll
+
